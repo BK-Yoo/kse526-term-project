@@ -8,7 +8,10 @@ import com.kse.bigdata.file.SourceFileMerger;
 public class Driver {
 
     public static void main(String[] args){
-        SourceFileMerger sourceFileMerger = new SourceFileMerger("C:\\Users\\user\\Downloads", "result.csv");
+        //!!!!!!Should change the directories of each file before executing the program!!!!!
+        String inputFile = "D:\\BigData_Term_Project\\Data";
+        String resultFile = "D:\\BigData_Term_Project\\Merge_Result.csv";
+        SourceFileMerger sourceFileMerger = new SourceFileMerger(inputFile, resultFile);
         sourceFileMerger.mergeFiles();
     }
 }

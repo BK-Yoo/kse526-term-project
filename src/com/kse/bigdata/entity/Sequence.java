@@ -1,10 +1,26 @@
+//        Copyright [BKYoo]
+//
+//        Licensed under the Apache License, Version 2.0 (the "License");
+//        you may not use this file except in compliance with the License.
+//        You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//        Unless required by applicable law or agreed to in writing, software
+//        distributed under the License is distributed on an "AS IS" BASIS,
+//        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//        See the License for the specific language governing permissions and
+//        limitations under the License.
+
 package com.kse.bigdata.entity;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.LinkedList;
 
 /**
  * Created by bk on 14. 12. 3.
+ * KSE526 Term Project
  */
 public class Sequence implements Comparable<Sequence>{
 
@@ -13,10 +29,9 @@ public class Sequence implements Comparable<Sequence>{
         public static final int SIZE_OF_TAIL_SEQ = 30;
 
         private double euclideanDistance = 100.0d;
-        private double[] sequence = new double[SIZE_OF_SEQUENCE];
         private double[] head     = new double[SIZE_OF_HEAD_SEQ];
         private double[] tail     = new double[SIZE_OF_TAIL_SEQ];
-        private double[] normTail = null;
+        private double[] normHead = new double[SIZE_OF_HEAD_SEQ];
 
         public Sequence(String totalInput) throws IOException {
             if(totalInput.equals(""))
@@ -29,8 +44,6 @@ public class Sequence implements Comparable<Sequence>{
             double value;
             for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
                 value = inputSequence.get(index);
-                sequence[index] = value;
-
                 if(index < SIZE_OF_HEAD_SEQ) {
                     head[index] = value;
                 } else{
@@ -43,18 +56,21 @@ public class Sequence implements Comparable<Sequence>{
 
         public void setEuclideanDistance(double distance){ this.euclideanDistance = distance; }
 
-        public void setNormTail(double[] normTail) { this.normTail = normTail; }
-
         /**
          * Parse the sequence data to string.<br>
          * {1,2,3,4,5} will be parsed to "1-2-3-4-5".
-         * @return
+         * @return String "Sequence + Euclidean Dist"
          */
         @Override
         public String toString(){
             StringBuilder stringBuilder = new StringBuilder();
             for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
-                stringBuilder.append(String.valueOf(sequence[index]));
+                if(index < SIZE_OF_HEAD_SEQ) {
+                    stringBuilder.append(String.valueOf(head[index]));
+                } else {
+                    stringBuilder.append(String.valueOf(tail[index - SIZE_OF_HEAD_SEQ]));
+                }
+
                 stringBuilder.append("-");
             }
 
@@ -66,15 +82,12 @@ public class Sequence implements Comparable<Sequence>{
         /**
          * Parse string to sequence.<br>
          * "1-2-3-4-5" will be parsed to {1,2,3,4,5}.
-         * @return
          */
         public void parseStringToSequence(String input){
             String[] values = input.split("-");
             double value;
             for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
                 value = Double.valueOf(values[index]);
-                sequence[index] = value;
-
                 if(index < SIZE_OF_HEAD_SEQ) {
                     head[index] = value;
                 } else {
@@ -90,16 +103,29 @@ public class Sequence implements Comparable<Sequence>{
             return this.head;
         }
 
-        public double[] getTail(boolean isNormalized){
-            if(isNormalized)
-                return this.normTail;
+        public double[] getNormHead(){
+            return this.normHead;
+        }
 
-            return this.tail;
+        public double[] getTail(){ return this.tail; }
+
+        public String getTailString(){
+            String tailString = "";
+            for(int index = 0; index < SIZE_OF_TAIL_SEQ; index ++){
+                tailString += tail[index];
+
+                if(index == (SIZE_OF_TAIL_SEQ - 1))
+                    break;
+
+                tailString += "-";
+            }
+
+            return tailString;
         }
 
         @Override
         public int hashCode() {
-            return sequence.hashCode();
+            return Arrays.hashCode(head) + Arrays.hashCode(tail);
         }
 
         @Override
@@ -111,9 +137,15 @@ public class Sequence implements Comparable<Sequence>{
 
                 Sequence seq = ((Sequence) obj);
 
-                for (int index = 0; index < SIZE_OF_SEQUENCE; index++)
-                    if (seq.sequence[index] != this.sequence[index])
+                for (int index = 0; index < SIZE_OF_SEQUENCE; index++){
+                    if ((index < SIZE_OF_HEAD_SEQ)) {
+                        if((seq.head[index] != this.head[index]))
+                            return false;
+
+                    } else if (seq.tail[index - SIZE_OF_HEAD_SEQ] == this.tail[index - SIZE_OF_HEAD_SEQ]) {
                         return false;
+                    }
+                }
 
                 return true;
 

@@ -38,11 +38,11 @@ public class Driver {
         private double[] tail     = new double[SIZE_OF_TAIL_SEQ];
         private double[] normTail = null;
 
-        public Sequence(String input) throws IOException{
-            if(input.equals(""))
+        public Sequence(String totalInput) throws IOException{
+            if(totalInput.equals(""))
                 throw new IOException();
 
-            parseStringToSequence(input);
+            parseStringToSequence(totalInput);
         }
 
         public Sequence(LinkedList<Double> inputSequence){
@@ -54,7 +54,7 @@ public class Driver {
                 if(index < SIZE_OF_HEAD_SEQ) {
                     head[index] = value;
                 } else{
-                    tail[index] = value;
+                    tail[index - SIZE_OF_HEAD_SEQ] = value;
                 }
             }
         }
@@ -100,7 +100,7 @@ public class Driver {
                 if(index < SIZE_OF_HEAD_SEQ) {
                     head[index] = value;
                 } else {
-                    tail[index] = value;
+                    tail[index - SIZE_OF_HEAD_SEQ] = value;
                 }
             }
         }
@@ -177,7 +177,7 @@ public class Driver {
 
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
-            String[] tokens = value.toString().split("\\s+");
+            String[] tokens = value.toString().split(",");
             double windSpeed = Double.valueOf(tokens[0]);
             int sourceFileId = Integer.valueOf(tokens[1]);
 
@@ -276,7 +276,7 @@ public class Driver {
         private Text tempKey = new Text();
 
         private Sequence userInputSequence;
-        private boolean normailization;
+        private boolean normalization;
 
         // Container of word for 100 most frequent sequences.
         private SortedSet<Sequence> sequences = new TreeSet<Sequence>();
@@ -287,7 +287,7 @@ public class Driver {
         public void setup(Context context) throws IOException{
             NUMBER_OF_NEIGHBOR = context.getConfiguration().getInt(NUMBER_OF_NEAREAST_NEIGHBOR, 100);
             userInputSequence  = new Sequence(context.getConfiguration().get(INPUT_SEQUENCE, ""));
-            normailization = context.getConfiguration().getBoolean(NORMALIZATION, false);
+            normalization = context.getConfiguration().getBoolean(NORMALIZATION, false);
         }
 
         @Override
@@ -310,7 +310,13 @@ public class Driver {
             emitWords(context);
         }
 
-        protected double[] predictSequence(SortedSet<Sequence> sequences){
+        private void emitWords(Context context) throws IOException, InterruptedException {
+            double[] result = predictSequence(this.sequences);
+            tempKey.set(result.toString());
+            context.write(NullWritable.get(), tempKey);
+        }
+
+        private double[] predictSequence(SortedSet<Sequence> sequences){
             double[] predictionResult = new double[Sequence.SIZE_OF_TAIL_SEQ];
             double sumOfWeights = 0.0d;
 
@@ -319,7 +325,7 @@ public class Driver {
             double weight;
             for(Sequence seq : sequences){
 
-                if(normailization) {
+                if(normalization) {
                     meanOfUserInputSequence = mean.evaluate(userInputSequence.getHead());
                     tailOfSeq = seq.getNormTail();
                     weight = seq.getEuclideanDistance();
@@ -342,12 +348,6 @@ public class Driver {
             return predictionResult;
         }
 
-        private void emitWords(Context context) throws IOException, InterruptedException {
-            double[] result = predictSequence(this.sequences);
-            tempKey.set(result.toString());
-            context.write(NullWritable.get(), tempKey);
-        }
-
         private void addWordToSortedSet(Sequence newSeq){
             sequences.add(newSeq);
 
@@ -365,12 +365,11 @@ public class Driver {
         //##################################################################################
         //##    Should change the directories of each file before executing the program   ##
         //##################################################################################
-//        String inputFileDirectory = "D:\\BigData_Term_Project\\Data";
-//        String resultFileDirectory = "D:\\BigData_Term_Project\\Merge_Result.csv";
+//        String inputFileDirectory = "/media/bk/드라이브/BigData_Term_Project/Test";
+//        String resultFileDirectory = "/media/bk/드라이브/BigData_Term_Project/Debug_Test.csv";
 //        File resultFile = new File(resultFileDirectory);
 //        if(!resultFile.exists())
 //            new SourceFileMerger(inputFileDirectory, resultFileDirectory).mergeFiles();
-
 
         /**
          * Hadoop Operation.
@@ -384,10 +383,18 @@ public class Driver {
         //Enable Profiling
         //conf.setBoolean("mapred.task.profile", true);
 
+        String testSeq = "0.62-0.92-1.63-2-1.92-2.38-3.05-3.67-3.89-4.5-" +
+                         "5.35-6.01-6.18-7.15-8.79-9.64-10-8.41-9.39-8.18-" +
+                         "8.18-9.97-10.26-10.26-11.36-11.55-12.05-12.35-13.24-13.54-"+
+                         "13.34-12.95-12.75-11.95-10.75-11.85";
+
         Path inputPath = null;
         Path outputPath = null;
         for(int index = 0; index < args.length; index++){
 
+            /**
+             * Mandatory command
+             */
             //Extract input path string from command line.
             if(args[index].equals("-in"))
                 inputPath = new Path(args[index + 1]);
@@ -396,6 +403,14 @@ public class Driver {
             if(args[index].equals("-out"))
                 outputPath = new Path(args[index + 1]);
 
+            //Input sequence
+            if(args[index].equals("-seq"))
+                conf.set(Map.INPUT_SEQUENCE, testSeq);//args[index + 1]);
+
+            /**
+             * Optional command
+             */
+
             //Extract the length of target words.
             if(args[index].equals("-dist")) {
                 conf.setInt(Map.EUCLIDEAN_DISTANCE_THRESHOLD, Integer.valueOf(args[index + 1]));
@@ -403,10 +418,6 @@ public class Driver {
             //Number of neighbor
             if(args[index].equals("-nn"))
                 conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.valueOf(args[index + 1]));
-
-            //Input sequence
-            if(args[index].equals("-seq"))
-                conf.set(Map.INPUT_SEQUENCE, args[index + 1]);
 
             //Normalization
             if(args[index].equals("-norm"))

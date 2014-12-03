@@ -24,7 +24,7 @@ public class SourceFileMerger {
     public SourceFileMerger(String inputDirectory, String outputDirectory){
         this.inputFolder = new File(inputDirectory);
         this.outputFile  = new File(outputDirectory);
-        this.sourceFiles = new ArrayList<File>();
+        this.sourceFiles = new ArrayList<>();
         addFilesInDirectory(this.inputFolder);
     }
 
@@ -32,6 +32,7 @@ public class SourceFileMerger {
         try(PrintWriter printWriter  = new PrintWriter(outputFile);){
 
             for(File sourceFile : sourceFiles) {
+                System.out.println(sourceFile.getName());
 
                 try (BufferedReader fileReader = new BufferedReader(new FileReader(sourceFile));) {
                     String line = "";

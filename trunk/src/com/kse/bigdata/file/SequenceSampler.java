@@ -1,3 +1,17 @@
+//        Copyright [BKYoo]
+//
+//        Licensed under the Apache License, Version 2.0 (the "License");
+//        you may not use this file except in compliance with the License.
+//        You may obtain a copy of the License at
+//
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+//        Unless required by applicable law or agreed to in writing, software
+//        distributed under the License is distributed on an "AS IS" BASIS,
+//        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//        See the License for the specific language governing permissions and
+//        limitations under the License.
+
 package com.kse.bigdata.file;
 
 import com.kse.bigdata.entity.Sequence;
@@ -15,6 +29,7 @@ import java.util.LinkedList;
 
 /**
  * Created by bk on 14. 12. 3.
+ * KSE526 Term Project
  */
 public class SequenceSampler {
 
@@ -23,12 +38,13 @@ public class SequenceSampler {
     private final int INDEX_OF_POWER_GENERATION_INFO = 3;
     private final String DELIMITER = ",";
     private final int TOTAL_SEQUENCE_LENGTH = 157971;
-    private final int SAMPLE_SIZE = 1;
+    private final int SAMPLE_SIZE;
     private final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
 
     private LinkedList<Sequence> randomSamples;
 
-    public SequenceSampler(String sampleDirectory){
+    public SequenceSampler(String sampleDirectory, int sampleSize){
+        SAMPLE_SIZE = sampleSize;
         sampleFile = new Path(sampleDirectory);
         randomSamples =  new LinkedList<>();
     }
@@ -54,7 +70,7 @@ public class SequenceSampler {
                 if (deque.size() == Sequence.SIZE_OF_SEQUENCE) {
 
                     for(int sampleIndex : sampleIndexes)
-                        if(sampleIndex == counter)
+                        if(/*sampleIndex*/60 == counter)
                             randomSamples.add(new Sequence(deque));
 
                     deque.removeFirst();
@@ -72,11 +88,22 @@ public class SequenceSampler {
     }
 
     private int[] getRandomSampleIndexArray(){
-        int[] sampleIndexes = new int[SAMPLE_SIZE * 2];
+        int[] sampleIndexes = new int[SAMPLE_SIZE];
         RandomGenerator lotto = new JDKRandomGenerator();
 
-        for(int index = 0; index < SAMPLE_SIZE * 2; index ++) {
-            sampleIndexes[index] = lotto.nextInt(TOTAL_SEQUENCE_LENGTH);
+        for(int index = 0; index < SAMPLE_SIZE; index ++) {
+
+            int randomIndex = 0;
+            boolean ok = true;
+
+            while(ok){
+                randomIndex = lotto.nextInt(TOTAL_SEQUENCE_LENGTH);
+
+                if(randomIndex + 35 < TOTAL_SEQUENCE_LENGTH)
+                    ok = false;
+            }
+
+            sampleIndexes[index] = randomIndex;
         }
 
         return sampleIndexes;

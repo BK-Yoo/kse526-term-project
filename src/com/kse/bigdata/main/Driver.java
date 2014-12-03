@@ -1,6 +1,5 @@
 package com.kse.bigdata.main;
 
-import com.kse.bigdata.file.SourceFileMerger;
 import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
@@ -17,7 +16,6 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -38,6 +36,7 @@ public class Driver {
         private double[] sequence = new double[SIZE_OF_SEQUENCE];
         private double[] head     = new double[SIZE_OF_HEAD_SEQ];
         private double[] tail     = new double[SIZE_OF_TAIL_SEQ];
+        private double[] normTail = null;
 
         public Sequence(String input) throws IOException{
             if(input.equals(""))
@@ -64,12 +63,17 @@ public class Driver {
 
         public void setEuclideanDistance(double distance){ this.euclideanDistance = distance; }
 
+        public void setNormTail(double[] normTail){ this.normTail = normTail; }
+
+        public double[] getNormTail() { return this.normTail; }
+
         /**
          * Parse the sequence data to string.<br>
          * {1,2,3,4,5} will be parsed to "1-2-3-4-5".
          * @return
          */
-        public String parseSequenceToString(){
+        @Override
+        public String toString(){
             StringBuilder stringBuilder = new StringBuilder();
             for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
                 stringBuilder.append(String.valueOf(sequence[index]));
@@ -89,7 +93,7 @@ public class Driver {
         public void parseStringToSequence(String input){
             String[] values = input.split("-");
             double value;
-            for(int index = 0; index < values.length; index++) {
+            for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
                 value = Double.valueOf(values[index]);
                 sequence[index] = value;
 
@@ -138,24 +142,22 @@ public class Driver {
 
         @Override
         public int compareTo(Sequence o) {
-            if (this.euclideanDistance == o.euclideanDistance) {
-                return 1;
+            return Double.compare(this.euclideanDistance, o.euclideanDistance);
 
-            } else {
-                return Double.compare(o.euclideanDistance, this.euclideanDistance);
-            }
         }
 
     }
 
     public static class Map extends Mapper<LongWritable, Text, NullWritable, Text> {
-        public static final String INPUT_SEQUENCE = "inputSeq";
+        public static final String NOMALIZATION                 = "normalize";
+        public static final String INPUT_SEQUENCE               = "inputSeq";
         public static final String EUCLIDEAN_DISTANCE_THRESHOLD = "eucDist";
 
         private double euclideanDistThreshold = 0.0d;
+        private boolean nomailization         = false;
 
         private Sequence userInputSequence;
-        private HashMap<Integer, LinkedList<Double>> tempSequence = new HashMap<Integer, LinkedList<Double>>();
+        private HashMap<Integer, LinkedList<Double>> tempSequence = new HashMap<>();
 
         private LinkedList<Sequence> sequences = new LinkedList<Sequence>();
 
@@ -167,8 +169,9 @@ public class Driver {
 
         @Override
         public void setup(Context context) throws IOException{
-            euclideanDistThreshold = 1.0d * context.getConfiguration().getInt(EUCLIDEAN_DISTANCE_THRESHOLD, -1);
-            userInputSequence = new Sequence(context.getConfiguration().get(INPUT_SEQUENCE, ""));
+            euclideanDistThreshold = 1.0d * context.getConfiguration().getInt(EUCLIDEAN_DISTANCE_THRESHOLD, 1);
+            userInputSequence      = new Sequence(context.getConfiguration().get(INPUT_SEQUENCE, ""));
+            nomailization          = context.getConfiguration().getBoolean(NOMALIZATION, false);
         }
 
 
@@ -190,7 +193,7 @@ public class Driver {
             if(temp.size() == Sequence.SIZE_OF_SEQUENCE){
                 Sequence sequence = new Sequence(temp);
                 sequence.setEuclideanDistance(calculateEuclideanDistance(sequence, userInputSequence));
-                if(sequence.getEuclideanDistance() >= euclideanDistThreshold)
+                if(sequence.getEuclideanDistance() <= euclideanDistThreshold)
                     sequences.add(sequence);
                 temp.removeFirst();
             }
@@ -200,16 +203,24 @@ public class Driver {
         @Override
         public void cleanup(Context context) throws InterruptedException, IOException{
             for(Sequence seq : sequences) {
-                result.set(seq.parseSequenceToString());
+                result.set(seq.toString());
                 context.write(NullWritable.get(), result);
             }
         }
 
         private double calculateEuclideanDistance(Sequence seqA, Sequence seqB){
-            return euclideanDistance.compute(normalize(seqA.getHead()), normalize(seqB.getHead()));
+            if(seqA.getNormTail() == null)
+                seqA.setNormTail(normalize(seqA.getHead()));
+            if(seqB.getNormTail() == null)
+                seqB.setNormTail(normalize(seqB.getHead()));
+
+            return euclideanDistance.compute(seqA.getNormTail(), seqB.getNormTail());
         }
 
         private double[] normalize(double[] targetSeq){
+            if(!nomailization)
+                return targetSeq;
+
             double[] normHead = new double[Sequence.SIZE_OF_HEAD_SEQ];
             double avg = mean.evaluate(targetSeq);
             double std = standardDeviation.evaluate(targetSeq);
@@ -223,9 +234,7 @@ public class Driver {
     }
 
     public static class Combiner extends Reduce{
-        private SortedSet<Sequence> sequences = new TreeSet<Sequence>();
-        private Text resultSeq = new Text();
-        private int BUFFER_SIZE = 400;
+        private SortedSet<Sequence> sequences = new TreeSet<>();
 
         @Override
         protected void reduce(NullWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
@@ -236,41 +245,49 @@ public class Driver {
                 if (sequences.isEmpty()) {
                     sequences.add(newSeq);
 
-                } else if (newSeq.getEuclideanDistance() >= sequences.last().getEuclideanDistance()) {
+                } else if (newSeq.getEuclideanDistance() <= sequences.last().getEuclideanDistance()) {
                     addWordToSortedSet(newSeq);
+                    context.write(NullWritable.get(), value);
                 }
             }
-
-            double[] result = predictSequence(sequences);
-            resultSeq.set(result.toString());
-            context.write(NullWritable.get(), resultSeq);
 
         }
 
         private void addWordToSortedSet(Sequence newSequence){
             sequences.add(newSequence);
 
-            if(sequences.size() > BUFFER_SIZE)
+            if(sequences.size() > NUMBER_OF_NEIGHBOR)
                 // last element has the smallest frequency among the sequences.
                 sequences.remove(sequences.last());
         }
     }
 
     public static class Reduce extends Reducer<NullWritable, Text, NullWritable, Text> {
-        public static String NUMBER_OF_NEAREAST_NEIGHBOR = "nnn";
+        public static final String NUMBER_OF_NEAREAST_NEIGHBOR = "nnn";
+        public static final String NORMALIZATION               = "normalize";
+        public static final String INPUT_SEQUENCE              = "inputSeq";
 
-        // Variables for reducing the cost of creating instance.
-        protected Text tempKey = new Text();
+
 
         // Constant for checking the size of sequences.
         protected int NUMBER_OF_NEIGHBOR = 0;
 
+        // Variables for reducing the cost of creating instance.
+        private Text tempKey = new Text();
+
+        private Sequence userInputSequence;
+        private boolean normailization;
+
         // Container of word for 100 most frequent sequences.
         private SortedSet<Sequence> sequences = new TreeSet<Sequence>();
 
+        private Mean mean = new Mean();
+
         @Override
-        public void setup(Context context){
-            NUMBER_OF_NEIGHBOR = context.getConfiguration().getInt(NUMBER_OF_NEAREAST_NEIGHBOR, -1);
+        public void setup(Context context) throws IOException{
+            NUMBER_OF_NEIGHBOR = context.getConfiguration().getInt(NUMBER_OF_NEAREAST_NEIGHBOR, 100);
+            userInputSequence  = new Sequence(context.getConfiguration().get(INPUT_SEQUENCE, ""));
+            normailization = context.getConfiguration().getBoolean(NORMALIZATION, false);
         }
 
         @Override
@@ -295,15 +312,32 @@ public class Driver {
 
         protected double[] predictSequence(SortedSet<Sequence> sequences){
             double[] predictionResult = new double[Sequence.SIZE_OF_TAIL_SEQ];
+            double sumOfWeights = 0.0d;
+
+            double meanOfUserInputSequence = 0.0d;
+            double[] tailOfSeq;
+            double weight;
             for(Sequence seq : sequences){
-                double[] tailOfSeq = seq.getTail();
+
+                if(normailization) {
+                    meanOfUserInputSequence = mean.evaluate(userInputSequence.getHead());
+                    tailOfSeq = seq.getNormTail();
+                    weight = seq.getEuclideanDistance();
+
+                } else {
+                    tailOfSeq   = seq.getTail();
+                    weight      = 1.0d;
+                }
+
+                sumOfWeights += weight;
+
                 for(int index = Sequence.SIZE_OF_HEAD_SEQ; index < Sequence.SIZE_OF_SEQUENCE; index++) {
-                    predictionResult[index] += tailOfSeq[index];
+                    predictionResult[index] +=  weight * tailOfSeq[index];
                 }
             }
 
             for(int index = Sequence.SIZE_OF_HEAD_SEQ; index < Sequence.SIZE_OF_SEQUENCE; index++)
-                predictionResult[index] += predictionResult[index] / sequences.size();
+                predictionResult[index] += meanOfUserInputSequence + predictionResult[index] / sumOfWeights;
 
             return predictionResult;
         }
@@ -331,11 +365,11 @@ public class Driver {
         //##################################################################################
         //##    Should change the directories of each file before executing the program   ##
         //##################################################################################
-        String inputFileDirectory = "D:\\BigData_Term_Project\\Data";
-        String resultFileDirectory = "D:\\BigData_Term_Project\\Merge_Result.csv";
-        File resultFile = new File(resultFileDirectory);
-        if(!resultFile.exists())
-            new SourceFileMerger(inputFileDirectory, resultFileDirectory).mergeFiles();
+//        String inputFileDirectory = "D:\\BigData_Term_Project\\Data";
+//        String resultFileDirectory = "D:\\BigData_Term_Project\\Merge_Result.csv";
+//        File resultFile = new File(resultFileDirectory);
+//        if(!resultFile.exists())
+//            new SourceFileMerger(inputFileDirectory, resultFileDirectory).mergeFiles();
 
 
         /**
@@ -344,8 +378,8 @@ public class Driver {
         Configuration conf = new Configuration();
 
         //Enable MapReduce intermediate compression as Snappy
-        conf.setBoolean("mapred.compress.map.output", true);
-        conf.set("mapred.map.output.compression.codec", "org.apache.hadoop.io.compress.SnappyCodec");
+//        conf.setBoolean("mapred.compress.map.output", true);
+//        conf.set("mapred.map.output.compression.codec", "org.apache.hadoop.io.compress.SnappyCodec");
 
         //Enable Profiling
         //conf.setBoolean("mapred.task.profile", true);
@@ -364,15 +398,19 @@ public class Driver {
 
             //Extract the length of target words.
             if(args[index].equals("-dist")) {
-                conf.set(Map.EUCLIDEAN_DISTANCE_THRESHOLD, args[index + 1]);
+                conf.setInt(Map.EUCLIDEAN_DISTANCE_THRESHOLD, Integer.valueOf(args[index + 1]));
             }
             //Number of neighbor
             if(args[index].equals("-nn"))
-                conf.set(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, args[index + 1]);
+                conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.valueOf(args[index + 1]));
 
             //Input sequence
             if(args[index].equals("-seq"))
                 conf.set(Map.INPUT_SEQUENCE, args[index + 1]);
+
+            //Normalization
+            if(args[index].equals("-norm"))
+                conf.setBoolean(Map.NOMALIZATION, true);
         }
 
         Job job = new Job(conf);

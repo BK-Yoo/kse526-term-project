@@ -32,14 +32,13 @@ import java.util.LinkedList;
  * KSE526 Term Project
  */
 public class SequenceSampler {
+    public final int INDEX_OF_POWER_GENERATION_INFO = 3;
+    public final String DELIMITER = ",";
+    public final int TOTAL_SEQUENCE_LENGTH = 157971 * 737;
+    public final int SAMPLE_SIZE;
+    public final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
 
     private final Path sampleFile;
-
-    private final int INDEX_OF_POWER_GENERATION_INFO = 3;
-    private final String DELIMITER = ",";
-    private final int TOTAL_SEQUENCE_LENGTH = 157971;
-    private final int SAMPLE_SIZE;
-    private final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
 
     private LinkedList<Sequence> randomSamples;
 
@@ -70,7 +69,7 @@ public class SequenceSampler {
                 if (deque.size() == Sequence.SIZE_OF_SEQUENCE) {
 
                     for(int sampleIndex : sampleIndexes)
-                        if(/*sampleIndex*/60 == counter)
+                        if(sampleIndex == counter)
                             randomSamples.add(new Sequence(deque));
 
                     deque.removeFirst();

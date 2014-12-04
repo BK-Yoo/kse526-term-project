@@ -16,10 +16,12 @@ package com.kse.bigdata.main;
 
 import com.kse.bigdata.entity.Sequence;
 import com.kse.bigdata.file.SequenceSampler;
+import com.kse.bigdata.file.SourceFileMerger;
 import org.apache.commons.math3.analysis.function.Log;
 import org.apache.commons.math3.ml.distance.EuclideanDistance;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.Precision;
 import org.apache.hadoop.conf.Configuration;
@@ -82,8 +84,8 @@ public class Driver {
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
             String[] tokens = value.toString().split(",");
-            double powerGeneration = Double.valueOf(tokens[0]);
-            int sourceFileId = Integer.valueOf(tokens[1]);
+            double powerGeneration = Double.parseDouble(tokens[0]);
+            int sourceFileId = Integer.parseInt(tokens[1]);
 
             if(tempSequence.containsKey(sourceFileId)) {
                 tempSequence.get(sourceFileId).add(powerGeneration);
@@ -144,11 +146,40 @@ public class Driver {
         }
     }
 
+    public static class Combiner extends Reducer<NullWritable, Text, NullWritable, Text>{
+
+        private SortedSet<Sequence> sequences = new TreeSet<>();
+        private final int BUFFER_SIZE = 500;
+
+        @Override
+        protected void reduce(NullWritable ignore, Iterable<Text> values, Context context)
+                throws IOException, InterruptedException {
+
+            for(Text value : values) {
+                Sequence newSeq = new Sequence(value.toString());
+                addWordToSortedSet(newSeq);
+
+                if(newSeq.getEuclideanDistance() <= sequences.last().getEuclideanDistance())
+                    context.write(NullWritable.get(), value);
+
+            }
+        }
+
+        private void addWordToSortedSet(Sequence newSeq){
+            sequences.add(newSeq);
+
+            if(sequences.size() > BUFFER_SIZE)
+                // last element has the smallest frequency among the sequences.
+                sequences.remove(sequences.last());
+        }
+    }
+
     public static class Reduce extends Reducer<NullWritable, Text, Text, Text> {
         public static final String NUMBER_OF_NEAREAST_NEIGHBOR = "nnn";
         public static final String INPUT_SEQUENCE              = "inputSeq";
 
-        private final int DECIMAL_SCALE = 2;
+        private final boolean MEAN        = true;
+        private final int DECIMAL_SCALE   = 2;
         private final int ROUNDING_METHOD = BigDecimal.ROUND_HALF_UP;
 
         // Constant for checking the size of sequences.
@@ -163,8 +194,9 @@ public class Driver {
         // Container of word for 100 most frequent sequences.
         private SortedSet<Sequence> sequences = new TreeSet<>();
 
-        private Mean mean = new Mean();
-        private Log  log  = new Log();
+        private Mean mean     = new Mean();
+        private Log  log      = new Log();
+        private Median median = new Median();
 
         @Override
         public void setup(Context context) throws IOException{
@@ -174,7 +206,8 @@ public class Driver {
         }
 
         @Override
-        protected void reduce(NullWritable ignore, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+        protected void reduce(NullWritable ignore, Iterable<Text> values, Context context)
+                throws IOException, InterruptedException {
             for(Text value : values) {
                 Sequence newSeq = new Sequence(value.toString());
                 addWordToSortedSet(newSeq);
@@ -182,52 +215,67 @@ public class Driver {
         }
 
         @Override
-        public void cleanup(Context context) throws IOException, InterruptedException { emitWords(context); }
+        public void cleanup(Context context) throws IOException, InterruptedException {
+            double[] predictedValues = predictSequence();
 
-        private void emitWords(Context context) throws IOException, InterruptedException {
-            double[] predictedValues = predictSequence(this.sequences);
-
-            String textResult = "";
+            StringBuffer buf =  new StringBuffer();
             for(int index = 0; index < predictedValues.length; index++){
-                textResult += predictedValues[index];
+                buf.append(predictedValues[index]);
 
                 if(index == (predictedValues.length - 1))
                     break;
 
-                textResult += "-";
+                buf.append("-");
             }
 
             double MER = calculateMeanErrorRate(predictedValues, userInputSequence.getTail());
             double MAE = calculateMeanAbsoluteError(predictedValues, userInputSequence.getTail());
 
-            tempKey.set(textResult);
+            tempKey.set(buf.toString());
             tempValue.set(String.valueOf(MER) + " " + String.valueOf(MAE));
             context.write(tempKey, tempValue);
         }
 
-        private double[] predictSequence(SortedSet<Sequence> sequences){
+        private double[] predictSequence(){
             double[] predictionResult = new double[Sequence.SIZE_OF_TAIL_SEQ];
-            double sumOfWeights = 0.0d;
+            ArrayList<double[]> tails = new ArrayList<>();
 
+            double sumOfWeights = 0.0d;
             double[] tailOfSeq;
             double weight;
-            for(Sequence seq : sequences) {
 
-                if(sequences.equals(userInputSequence))
-                    continue;
-
+            int counter = 0;
+            for(Sequence seq : this.sequences) {
                 tailOfSeq = seq.getTail();
-                weight = calculateWeight(seq);
-                sumOfWeights += weight;
 
-                for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
-                    predictionResult[index] += weight * tailOfSeq[index];
+                if (MEAN) {
+                    weight = calculateWeight(seq);
+                    sumOfWeights += weight;
+
+                    for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+                        predictionResult[index] += weight * tailOfSeq[index];
+                    }
+
+                } else {
+                    for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+                        if(tails.get(index) == null)
+                            tails.add(new double[this.sequences.size()]);
+
+                        tails.get(index)[counter] = tailOfSeq[index];
+                    }
+
+                    counter++;
                 }
             }
 
-            for(int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++)
-                predictionResult[index] = Precision.round((predictionResult[index] / sumOfWeights),
-                        DECIMAL_SCALE, ROUNDING_METHOD);
+            for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+                if(MEAN) {
+                    predictionResult[index] = Precision.round((predictionResult[index] / sumOfWeights),
+                            DECIMAL_SCALE, ROUNDING_METHOD);
+                } else {
+                    predictionResult[index] = median.evaluate(tails.get(index));
+                }
+            }
 
             return predictionResult;
         }
@@ -277,162 +325,165 @@ public class Driver {
         //##################################################################################
         //##    Should change the directories of each file before executing the program   ##
         //##################################################################################
-//        String inputFileDirectory = "/media/bk/드라이브/BigData_Term_Project/Test";
-//        String resultFileDirectory = "/media/bk/드라이브/BigData_Term_Project/Debug_Test.csv";
-//        File resultFile = new File(resultFileDirectory);
-//        if(!resultFile.exists())
-//            new SourceFileMerger(inputFileDirectory, resultFileDirectory).mergeFiles();
+        String inputFileDirectory = "/media/bk/드라이브/BigData_Term_Project/Data";
+        String resultFileDirectory = "/media/bk/드라이브/BigData_Term_Project/data.csv";
+        File resultFile = new File(resultFileDirectory);
+        if(!resultFile.exists())
+            new SourceFileMerger(inputFileDirectory, resultFileDirectory).mergeFiles();
 
-        /**
-         * Hadoop Operation.
-         */
-        Configuration conf = new Configuration();
-
-        //Enable MapReduce intermediate compression as Snappy
-        conf.setBoolean("mapred.compress.map.output", true);
-        conf.set("mapred.map.output.compression.codec", "org.apache.hadoop.io.compress.SnappyCodec");
-
-        //Enable Profiling
-        //conf.setBoolean("mapred.task.profile", true);
-
-        String testPath = null;
-        String inputPath = null;
-        String outputPath = null;
-
-        int sampleSize = 1;
-        ArrayList<String> results = new ArrayList<>();
-
-        for(int index = 0; index < args.length; index++){
-
+        if(false) {
             /**
-             * Mandatory command
+             * Hadoop Operation.
              */
-            //Extract input path string from command line.
-            if(args[index].equals("-in"))
-                inputPath = args[index + 1];
+            Configuration conf = new Configuration();
 
-            //Extract output path string from command line.
-            if(args[index].equals("-out"))
-                outputPath = args[index + 1];
+            //Enable MapReduce intermediate compression as Snappy
+            conf.setBoolean("mapred.compress.map.output", true);
+            conf.set("mapred.map.output.compression.codec", "org.apache.hadoop.io.compress.SnappyCodec");
 
-            if(args[index].equals("-test"))
-                testPath = args[index + 1];
+            //Enable Profiling
+            //conf.setBoolean("mapred.task.profile", true);
 
-            /**
-             * Optional command
-             */
-            //Euclidean distance threshold.
+            String testPath = null;
+            String inputPath = null;
+            String outputPath = null;
+
+            int sampleSize = 1;
+            ArrayList<String> results = new ArrayList<>();
+
+            for (int index = 0; index < args.length; index++) {
+
+                /**
+                 * Mandatory command
+                 */
+                //Extract input path string from command line.
+                if (args[index].equals("-in"))
+                    inputPath = args[index + 1];
+
+                //Extract output path string from command line.
+                if (args[index].equals("-out"))
+                    outputPath = args[index + 1];
+
+                if (args[index].equals("-test"))
+                    testPath = args[index + 1];
+
+                /**
+                 * Optional command
+                 */
+                //Euclidean distance threshold.
 //            if(args[index].equals("-dist")) {
 //                conf.setInt(Map.EUCLIDEAN_DISTANCE_THRESHOLD, Integer.valueOf(args[index + 1]));
 //            }
-            //Number of neighbor
-            if(args[index].equals("-nn"))
-                conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.valueOf(args[index + 1]));
+                //Number of neighbor
+                if (args[index].equals("-nn"))
+                    conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.valueOf(args[index + 1]));
 
-//            //Normalization
-//            if(args[index].equals("-norm"))
-//                conf.setBoolean(Map.NORMALIZATION, true);
+            //Normalization
+            if(args[index].equals("-norm"))
+                conf.setBoolean(Map.NORMALIZATION, true);
 
-            //Test Sample Size
-            if(args[index].equals("-s"))
-                sampleSize = Integer.valueOf(args[index+1]);
-        }
+                //Test Sample Size
+                if (args[index].equals("-s"))
+                    sampleSize = Integer.valueOf(args[index + 1]);
+            }
 
-        String outputFileName = "part-r-00000";
-        String finalOutputPath = "project/output/result";
+            String outputFileName = "part-r-00000";
+            String finalOutputPath = "project/output/result";
 
-        SequenceSampler sampler = new SequenceSampler(testPath, sampleSize);
-        LinkedList<Sequence> testSequences = sampler.getRandomSample();
+            SequenceSampler sampler = new SequenceSampler(testPath, sampleSize);
+            LinkedList<Sequence> testSequences = sampler.getRandomSample();
 
-        for(Sequence seq : testSequences) {
-            System.out.println(seq.getTailString());
+            for (Sequence seq : testSequences) {
+                System.out.println(seq.getTailString());
 
-            conf.set(Map.INPUT_SEQUENCE, seq.toString());
+                conf.set(Map.INPUT_SEQUENCE, seq.toString());
 
-            Job job = new Job(conf);
-            job.setJarByClass(Driver.class);
-            job.setJobName("term-project-driver");
+                Job job = new Job(conf);
+                job.setJarByClass(Driver.class);
+                job.setJobName("term-project-driver");
 
-            job.setMapperClass(Map.class);
-            job.setMapOutputKeyClass(NullWritable.class);
-            job.setMapOutputValueClass(Text.class);
+                job.setMapperClass(Map.class);
+                job.setMapOutputKeyClass(NullWritable.class);
+                job.setMapOutputValueClass(Text.class);
 
-            //Set 1 for number of reduce task for keeping 100 most sequences in sorted set.
-            job.setReducerClass(Reduce.class);
-            job.setOutputKeyClass(Text.class);
-            job.setOutputValueClass(Text.class);
-            job.setNumReduceTasks(1);
+                //Set 1 for number of reduce task for keeping 100 most sequences in sorted set.
+                job.setReducerClass(Reduce.class);
+                job.setOutputKeyClass(Text.class);
+                job.setOutputValueClass(Text.class);
+                job.setNumReduceTasks(1);
 
-            job.setInputFormatClass(TextInputFormat.class);
-            job.setOutputFormatClass(TextOutputFormat.class);
+                job.setInputFormatClass(TextInputFormat.class);
+                job.setOutputFormatClass(TextOutputFormat.class);
 
-            FileInputFormat.setInputPaths(job, new Path(inputPath));
-            FileOutputFormat.setOutputPath(job, new Path(outputPath));
+                FileInputFormat.setInputPaths(job, new Path(inputPath));
+                FileOutputFormat.setOutputPath(job, new Path(outputPath));
 
-            job.waitForCompletion(true);
+                job.waitForCompletion(true);
 
-            try(FileSystem hdfs = FileSystem.get(new Configuration());) {
+                try (FileSystem hdfs = FileSystem.get(new Configuration());) {
 
-                BufferedReader fileReader = new BufferedReader(new InputStreamReader(
-                        hdfs.open(new Path(outputPath + "/" + outputFileName))));
+                    BufferedReader fileReader = new BufferedReader(new InputStreamReader(
+                            hdfs.open(new Path(outputPath + "/" + outputFileName))));
 
-                String line;
-                while((line=fileReader.readLine())!=null) {
-                    results.add(seq.getTailString() + " " +line);
+                    String line;
+                    while ((line = fileReader.readLine()) != null) {
+                        results.add(seq.getTailString() + " " + line);
+                    }
+
+                    fileReader.close();
+
+                    hdfs.delete(new Path(outputPath), true);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
+            }
+
+            try (FileSystem hdfs = FileSystem.get(new Configuration());) {
+
+                Path file = new Path(finalOutputPath);
+                if (hdfs.exists(file)) {
+                    hdfs.delete(file, true);
                 }
 
-                fileReader.close();
+                OutputStream os = hdfs.create(file);
+                PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(os, "UTF-8"));
 
-                hdfs.delete(new Path(outputPath), true);
+                double totalMER = 0.0d;
+                double totalMAE = 0.0d;
+
+                for (String result : results) {
+                    String[] tokens = result.split("\\s+");
+
+                    totalMER += Double.valueOf(tokens[2]);
+                    totalMAE += Double.valueOf(tokens[3]);
+
+                    String actualSeq = "A:" + tokens[0];
+                    String predictedSeq = "P:" + tokens[1];
+                    String errorOutput = " [ MER : " + tokens[2] + " MAE : " + tokens[3] + " ]";
+
+                    printWriter.println(actualSeq);
+                    printWriter.println(predictedSeq);
+                    printWriter.println(errorOutput);
+                    printWriter.flush();
+                }
+
+                String errorOutputString = "[ AVG.MER : " +
+                        Precision.round(totalMER / results.size(), 2, BigDecimal.ROUND_HALF_UP) +
+                        "  AVG.MAE : " + Precision.round(totalMAE / results.size(), 2, BigDecimal.ROUND_HALF_UP) + " ]";
+
+                printWriter.println(errorOutputString);
+                printWriter.flush();
+
+                printWriter.close();
 
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(1);
             }
+
         }
-
-        try(FileSystem hdfs = FileSystem.get(new Configuration());) {
-
-            Path file = new Path(finalOutputPath);
-            if(hdfs.exists(file)) { hdfs.delete(file, true);}
-
-            OutputStream os = hdfs.create(file);
-            PrintWriter printWriter = new PrintWriter(new OutputStreamWriter(os, "UTF-8"));
-
-            double totalMER = 0.0d;
-            double totalMAE = 0.0d;
-
-            for(String result : results){
-                String[] tokens = result.split("\\s+");
-
-                totalMER += Double.valueOf(tokens[2]);
-                totalMAE += Double.valueOf(tokens[3]);
-
-                String actualSeq = "A:" + tokens[0];
-                String predictedSeq = "P:" + tokens[1];
-                String errorOutput =" [ MER : " + tokens[2] + " MAE : " + tokens[3] +" ]";
-
-                printWriter.println(actualSeq);
-                printWriter.println(predictedSeq);
-                printWriter.println(errorOutput);
-                printWriter.flush();
-            }
-
-            String errorOutputString = "[ AVG.MER : " +
-                    Precision.round(totalMER/ results.size(), 2, BigDecimal.ROUND_HALF_UP) +
-                    "  AVG.MAE : " + Precision.round(totalMAE/ results.size(), 2, BigDecimal.ROUND_HALF_UP) + " ]";
-
-            printWriter.println(errorOutputString);
-            printWriter.flush();
-
-            printWriter.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-
     }
 
 }

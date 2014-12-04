@@ -110,17 +110,17 @@ public class Sequence implements Comparable<Sequence>{
         public double[] getTail(){ return this.tail; }
 
         public String getTailString(){
-            String tailString = "";
+            StringBuilder stringBuilder = new StringBuilder();
             for(int index = 0; index < SIZE_OF_TAIL_SEQ; index ++){
-                tailString += tail[index];
+                stringBuilder.append(tail[index]);
 
                 if(index == (SIZE_OF_TAIL_SEQ - 1))
                     break;
 
-                tailString += "-";
+                stringBuilder.append("-");
             }
 
-            return tailString;
+            return stringBuilder.toString();
         }
 
         @Override

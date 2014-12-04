@@ -25,14 +25,14 @@ import java.util.regex.Pattern;
  */
 public class SourceFileMerger {
 
+    public final String DELIMITER = ",";
+    public final String SOURCE_FILE_NAME_PATTERN = "^SITE_.*$";
+    public final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
+    public final int INDEX_OF_POWER_GENERATION_INFO = 3;
+
     private final File inputFolder;
     private final File outputFile;
     private ArrayList<File> sourceFiles;
-
-    private final String DELIMITER = ",";
-    private final String SOURCE_FILE_NAME_PATTERN = "^SITE_.*$";
-    private final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
-    private final int INDEX_OF_POWER_GENERATION_INFO = 3;
 
     private Pattern sourceFIleNumberPattern = Pattern.compile("\\_(.*?)\\.");
 

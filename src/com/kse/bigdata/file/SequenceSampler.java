@@ -1,16 +1,17 @@
-//        Copyright [BKYoo]
-//
-//        Licensed under the Apache License, Version 2.0 (the "License");
-//        you may not use this file except in compliance with the License.
-//        You may obtain a copy of the License at
-//
-//        http://www.apache.org/licenses/LICENSE-2.0
-//
-//        Unless required by applicable law or agreed to in writing, software
-//        distributed under the License is distributed on an "AS IS" BASIS,
-//        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//        See the License for the specific language governing permissions and
-//        limitations under the License.
+/*        Copyright [BKYoo]
+ *
+ *        Licensed under the Apache License, Version 2.0 (the "License");
+ *        you may not use this file except in compliance with the License.
+ *        You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *        Unless required by applicable law or agreed to in writing, software
+ *        distributed under the License is distributed on an "AS IS" BASIS,
+ *         WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *        See the License for the specific language governing permissions and
+ *        limitations under the License.
+ */
 
 package com.kse.bigdata.file;
 
@@ -32,14 +33,16 @@ import java.util.LinkedList;
  * KSE526 Term Project
  */
 public class SequenceSampler {
-    public final int INDEX_OF_POWER_GENERATION_INFO = 3;
+    public final int INDEX_OF_POWER_GENERATION_INFO = 0;
     public final String DELIMITER = ",";
-    public final int TOTAL_SEQUENCE_LENGTH = 157971 * 737;
     public final int SAMPLE_SIZE;
-    public final String EXCLUDE_LINE_PATTERN = "^(DATE|SITE).*$";
+
+    private final int NUMBER_OF_TEST_SET_FILE = 737;
+    private final int NUMBER_OF_HEAD_ROW = 3;
+    private final int TOTAL_ROW_IN_RAW_FILE = 157971 - NUMBER_OF_HEAD_ROW;
+    private final int TOTAL_SEQUENCE_LENGTH = TOTAL_ROW_IN_RAW_FILE * NUMBER_OF_TEST_SET_FILE;
 
     private final Path sampleFile;
-
     private LinkedList<Sequence> randomSamples;
 
     public SequenceSampler(String sampleDirectory, int sampleSize){
@@ -49,20 +52,19 @@ public class SequenceSampler {
     }
 
     public LinkedList<Sequence> getRandomSample(){
+        System.out.println("Sampling Start...");
+        System.out.println("Sample Size is  "+ SAMPLE_SIZE);
+
         try ( FileSystem fs = FileSystem.get(new Configuration());
                 BufferedReader fileReader = new BufferedReader(new InputStreamReader(fs.open(sampleFile)))) {
 
             LinkedList<Double> deque = new LinkedList<>();
-            String line = "";
+            String line;
             int[] sampleIndexes = getRandomSampleIndexArray();
             int counter = -1;
 
-            //Read the file line by line
             while((line=fileReader.readLine())!=null){
                 counter++;
-
-                if(line.matches(EXCLUDE_LINE_PATTERN))
-                    continue;
 
                 deque.add(extractValidInformation(line));
 
@@ -98,7 +100,7 @@ public class SequenceSampler {
             while(ok){
                 randomIndex = lotto.nextInt(TOTAL_SEQUENCE_LENGTH);
 
-                if(randomIndex + 35 < TOTAL_SEQUENCE_LENGTH)
+                if(randomIndex + (Sequence.SIZE_OF_SEQUENCE - 1)  < TOTAL_SEQUENCE_LENGTH)
                     ok = false;
             }
 
@@ -110,10 +112,6 @@ public class SequenceSampler {
 
 
     private double extractValidInformation(String line) throws IOException{
-        String powerGenerationData = line.split(DELIMITER)[INDEX_OF_POWER_GENERATION_INFO];
-        if(powerGenerationData.startsWith("."))
-            powerGenerationData = "0".concat(powerGenerationData);
-
-        return Double.valueOf(powerGenerationData);
+        return Double.parseDouble(line.split(DELIMITER)[INDEX_OF_POWER_GENERATION_INFO]);
     }
 }

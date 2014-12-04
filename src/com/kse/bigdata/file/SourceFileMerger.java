@@ -1,16 +1,17 @@
-//        Copyright [BKYoo]
-//
-//        Licensed under the Apache License, Version 2.0 (the "License");
-//        you may not use this file except in compliance with the License.
-//        You may obtain a copy of the License at
-//
-//        http://www.apache.org/licenses/LICENSE-2.0
-//
-//        Unless required by applicable law or agreed to in writing, software
-//        distributed under the License is distributed on an "AS IS" BASIS,
-//        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//        See the License for the specific language governing permissions and
-//        limitations under the License.
+/*        Copyright [BKYoo]
+ *
+ *        Licensed under the Apache License, Version 2.0 (the "License");
+ *        you may not use this file except in compliance with the License.
+ *        You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *        Unless required by applicable law or agreed to in writing, software
+ *        distributed under the License is distributed on an "AS IS" BASIS,
+ *         WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *        See the License for the specific language governing permissions and
+ *        limitations under the License.
+ */
 
 package com.kse.bigdata.file;
 
@@ -44,22 +45,21 @@ public class SourceFileMerger {
     }
 
     public void mergeFiles(){
-        try(PrintWriter printWriter  = new PrintWriter(outputFile);){
+        try(PrintWriter printWriter  = new PrintWriter(outputFile)){
 
             for(File sourceFile : sourceFiles) {
                 System.out.println(sourceFile.getName());
 
-                try (BufferedReader fileReader = new BufferedReader(new FileReader(sourceFile));) {
-                    String line = "";
-                    String fileName = sourceFile.getName();
+                try (BufferedReader fileReader = new BufferedReader(new FileReader(sourceFile))) {
 
                     //Read the file line by line
+                    String line;
                     while ((line = fileReader.readLine()) != null) {
 
                         if(line.matches(EXCLUDE_LINE_PATTERN))
                             continue;
 
-                        printWriter.println(extractValidInformation(line, fileName));
+                        printWriter.println(extractValidInformation(line, sourceFile.getName()));
                         printWriter.flush();
                     }
 

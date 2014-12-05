@@ -95,13 +95,25 @@ public class SequenceSampler {
         for(int index = 0; index < SAMPLE_SIZE; index ++) {
 
             int randomIndex = 0;
+            int fileEdgeNumber;
             boolean ok = true;
 
             while(ok){
                 randomIndex = lotto.nextInt(TOTAL_SEQUENCE_LENGTH);
 
-                if(randomIndex + (Sequence.SIZE_OF_SEQUENCE - 1)  < TOTAL_SEQUENCE_LENGTH)
-                    ok = false;
+                if((randomIndex + (Sequence.SIZE_OF_SEQUENCE - 1)  < TOTAL_SEQUENCE_LENGTH)) {
+
+                    for(int fileIndex = 0; fileIndex < NUMBER_OF_TEST_SET_FILE; fileIndex++) {
+                        fileEdgeNumber = TOTAL_ROW_IN_RAW_FILE * fileIndex;
+
+                        if (((randomIndex < fileEdgeNumber) &&
+                                (fileEdgeNumber < randomIndex + (Sequence.SIZE_OF_SEQUENCE - 1)))) {
+
+                        } else {
+                            ok = false;
+                        }
+                    }
+                }
             }
 
             sampleIndexes[index] = randomIndex;

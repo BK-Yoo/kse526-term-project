@@ -175,7 +175,7 @@ public class Driver {
         public static final String INPUT_SEQUENCE              = "inputSeq";
 
         //Parameters for rounding method.
-        private final int DECIMAL_SCALE   = 2;
+        private final int DECIMAL_SCALE   = 3;
         private final int ROUNDING_METHOD = BigDecimal.ROUND_HALF_UP;
 
         private int     NUMBER_OF_NEIGHBOR = 0;

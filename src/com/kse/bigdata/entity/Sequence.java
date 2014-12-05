@@ -28,11 +28,11 @@ public class Sequence implements Comparable<Sequence>{
     /*
      * Size Of Sequence can be adjusted to other values.
      */
-    public static final int SIZE_OF_HEAD_SEQ = 12;
-    public static final int SIZE_OF_TAIL_SEQ = SIZE_OF_HEAD_SEQ * 2;
+    public static final int SIZE_OF_HEAD_SEQ = 6;
+    public static final int SIZE_OF_TAIL_SEQ = 30;
     public static final int SIZE_OF_SEQUENCE = SIZE_OF_HEAD_SEQ + SIZE_OF_TAIL_SEQ;
 
-    private final String DELIMITER = "-";
+    private final String DELIMITER = "\\-+";
 
     private double euclideanDistance = 100.0d;
     private double[] head     = new double[SIZE_OF_HEAD_SEQ];
@@ -64,17 +64,21 @@ public class Sequence implements Comparable<Sequence>{
 
     /**
      * Parse the sequence data to string.<br>
-     * {1,2,3,4,5} will be parsed to "1-2-3-4-5".
+     * {1,2,3,4,5}, Euclidean_Dist = 3.2 will be parsed to "1-2-3-4-5-3.2".
      * @return String "Sequence + Euclidean Dist"
      */
     @Override
     public String toString(){
+        //"-" is appended twice for some case(Especially, psuado-cluster environment problem).
+        //This is the bug I think, so use StringBuffer instead of StringBuilder.
         StringBuilder stringBuilder = new StringBuilder();
+
         for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
             if(index < SIZE_OF_HEAD_SEQ) {
-                stringBuilder.append(String.valueOf(head[index]));
+                stringBuilder.append(head[index]);
+
             } else {
-                stringBuilder.append(String.valueOf(tail[index - SIZE_OF_HEAD_SEQ]));
+                stringBuilder.append(tail[index - SIZE_OF_HEAD_SEQ]);
             }
 
             stringBuilder.append(DELIMITER);
@@ -92,9 +96,10 @@ public class Sequence implements Comparable<Sequence>{
     public void parseStringToSequence(String input){
         String[] values = input.split(DELIMITER);
         double value;
-        for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
+
+        for (int index = 0; index < SIZE_OF_SEQUENCE; index++) {
             value = Double.valueOf(values[index]);
-            if(index < SIZE_OF_HEAD_SEQ) {
+            if (index < SIZE_OF_HEAD_SEQ) {
                 head[index] = value;
             } else {
                 tail[index - SIZE_OF_HEAD_SEQ] = value;

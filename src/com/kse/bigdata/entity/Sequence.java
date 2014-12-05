@@ -32,7 +32,8 @@ public class Sequence implements Comparable<Sequence>{
     public static final int SIZE_OF_TAIL_SEQ = 30;
     public static final int SIZE_OF_SEQUENCE = SIZE_OF_HEAD_SEQ + SIZE_OF_TAIL_SEQ;
 
-    private final String DELIMITER = "\\-+";
+    private final String DELIMITER   = "-";
+    private final String SPLIT_REGEX = "\\-+";
 
     private double euclideanDistance = 100.0d;
     private double[] head     = new double[SIZE_OF_HEAD_SEQ];
@@ -94,9 +95,8 @@ public class Sequence implements Comparable<Sequence>{
      * "1-2-3-4-5" will be parsed to {1,2,3,4,5}.
      */
     public void parseStringToSequence(String input){
-        String[] values = input.split(DELIMITER);
+        String[] values = input.split(SPLIT_REGEX);
         double value;
-
         for (int index = 0; index < SIZE_OF_SEQUENCE; index++) {
             value = Double.valueOf(values[index]);
             if (index < SIZE_OF_HEAD_SEQ) {

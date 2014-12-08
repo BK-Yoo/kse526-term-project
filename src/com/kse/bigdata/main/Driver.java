@@ -82,13 +82,16 @@ public class Driver {
         public static final String NORMALIZATION                = "normalize";
         public static final String INPUT_SEQUENCE               = "inputSeq";
 
+        //parameters which user set.
+        //get the initial values in the setup method.
         private boolean normalization         = false;
         private int NUMBER_OF_NEIGHBOR        = 100;
-        private int previousSourceFileId      = -1;
         private Sequence userInputSequence;
 
+        private int previousSourceFileId      = -1;
+
         private final Text                result     = new Text();
-        private LinkedList<Double>        buffer     = new LinkedList<>();
+        private final LinkedList<Double>  buffer     = new LinkedList<>();
         private final SortedSet<Sequence> neighbors  = new TreeSet<>();
 
         private final StandardDeviation standardDeviation = new StandardDeviation();
@@ -164,12 +167,13 @@ public class Driver {
         }
     }
 
-
     public static class Reduce extends Reducer<NullWritable, Text, Text, Text> {
         public static final String MEDIAN                      = "median";
         public static final String NUMBER_OF_NEAREAST_NEIGHBOR = "nnn";
         public static final String INPUT_SEQUENCE              = "inputSeq";
 
+        //parameters which user set.
+        //get the initial values in the setup method.
         private int     NUMBER_OF_NEIGHBOR = 0;
         private boolean USE_MEDIAN         = false;
 
@@ -187,7 +191,6 @@ public class Driver {
 
         private final Mean   mean     = new Mean();
         private final Median median   = new Median();
-//        private Log  log      = new Log();
 
         @Override
         public void setup(Context context) throws IOException{
@@ -299,7 +302,8 @@ public class Driver {
             return Precision.round((error / Sequence.SIZE_OF_TAIL_SEQ), DECIMAL_SCALE, ROUNDING_METHOD);
         }
 
-        //        private double calculateWeight(){
+//        private Log  log      = new Log();
+//        private double calculateWeight(){
 //            double eucDist = seq.getEuclideanDistance();
 
 //            if(eucDist == 0)

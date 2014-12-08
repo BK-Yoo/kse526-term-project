@@ -28,13 +28,16 @@ public class Sequence implements Comparable<Sequence>{
     /*
      * Size Of Sequence can be adjusted to other values.
      */
-    public static final int SIZE_OF_HEAD_SEQ = 6;
-    public static final int SIZE_OF_TAIL_SEQ = 30;
-    public static final int SIZE_OF_SEQUENCE = SIZE_OF_HEAD_SEQ + SIZE_OF_TAIL_SEQ;
+    public static final int    SIZE_OF_HEAD_SEQ = 6;
+    public static final int    SIZE_OF_TAIL_SEQ = 36;
+    public static final int    SIZE_OF_SEQUENCE = SIZE_OF_HEAD_SEQ + SIZE_OF_TAIL_SEQ;
+    public static final String DELIMITER        = "-";
 
-    private final String DELIMITER   = "-";
+    //test(6 + 18)
+    //remaining    : 42
+    //done         : 6, 30, 12, 18, 24, 36
+
     private final String SPLIT_REGEX = "\\-+";
-
     private double euclideanDistance = 100.0d;
     private double[] head     = new double[SIZE_OF_HEAD_SEQ];
     private double[] tail     = new double[SIZE_OF_TAIL_SEQ];
@@ -86,6 +89,24 @@ public class Sequence implements Comparable<Sequence>{
         }
 
         stringBuilder.append(euclideanDistance);
+
+        return stringBuilder.toString();
+    }
+
+    public String getSeqString(){
+        StringBuilder stringBuilder = new StringBuilder();
+
+        for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
+            if(index < SIZE_OF_HEAD_SEQ) {
+                stringBuilder.append(head[index]);
+
+            } else {
+                stringBuilder.append(tail[index - SIZE_OF_HEAD_SEQ]);
+            }
+
+            if(index != SIZE_OF_SEQUENCE - 1)
+                stringBuilder.append(DELIMITER);
+        }
 
         return stringBuilder.toString();
     }

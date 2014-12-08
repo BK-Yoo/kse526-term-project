@@ -371,7 +371,7 @@ public class Driver {
              */
             //Extract a number of neighbors.
             if (args[index].equals("-nn"))
-                conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.valueOf(args[index + 1]));
+                conf.setInt(Reduce.NUMBER_OF_NEAREAST_NEIGHBOR, Integer.parseInt(args[index + 1]));
 
             //Whether job uses normalization or not.
             if(args[index].equals("-norm"))

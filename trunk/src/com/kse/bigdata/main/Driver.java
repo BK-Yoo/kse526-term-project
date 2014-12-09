@@ -15,6 +15,7 @@
 
 package com.kse.bigdata.main;
 
+import com.kse.bigdata.dist.DTW;
 import com.kse.bigdata.entity.Sequence;
 import com.kse.bigdata.file.SequenceSampler;
 import org.apache.commons.math3.ml.distance.EuclideanDistance;
@@ -94,6 +95,8 @@ public class Driver {
         private final LinkedList<Double>  buffer     = new LinkedList<>();
         private final SortedSet<Sequence> neighbors  = new TreeSet<>();
 
+        private DTW dtw;
+
         private final StandardDeviation standardDeviation = new StandardDeviation();
         private final Mean              mean              = new Mean();
         private final EuclideanDistance euclideanDistance = new EuclideanDistance();
@@ -103,6 +106,7 @@ public class Driver {
             userInputSequence      = new Sequence(context.getConfiguration().get(INPUT_SEQUENCE, ""));
             NUMBER_OF_NEIGHBOR     = context.getConfiguration().getInt(NUMBER_OF_NEAREST_NEIGHBOR, 100);
             normalization          = context.getConfiguration().getBoolean(NORMALIZATION, false);
+            dtw                    = new DTW(userInputSequence.getHead());
         }
 
 
@@ -121,7 +125,8 @@ public class Driver {
 
             if(buffer.size() == Sequence.SIZE_OF_SEQUENCE){
                 Sequence newSeq = new Sequence(buffer);
-                newSeq.setEuclideanDistance(calculateEuclideanDistance(newSeq, userInputSequence));
+//                newSeq.setDistance(calculateEuclideanDistance(newSeq, userInputSequence));
+                newSeq.setDistance(dtw.evaluate(newSeq.getHead()));
                 addSeqToNeighbors(newSeq);
                 buffer.removeFirst();
             }
@@ -161,7 +166,7 @@ public class Driver {
             double avg = mean.evaluate(targetSeq.getHead());
             double std = standardDeviation.evaluate(targetSeq.getHead());
 
-            for(int index = 0; index < Sequence.SIZE_OF_HEAD_SEQ; index++){
+            for(int index = 0; index < Sequence.SIZE_OF_WINDOW; index++){
                 normHead[index] = (head[index] - avg) / std;
             }
         }
@@ -239,8 +244,8 @@ public class Driver {
         }
 
         private double[] predictSequence(){
-            double[] predictionResult = new double[Sequence.SIZE_OF_TAIL_SEQ];
-            double[][] tails = new double[Sequence.SIZE_OF_TAIL_SEQ][];
+            double[] predictionResult = new double[Sequence.SIZE_OF_PREDICTION];
+            double[][] tails = new double[Sequence.SIZE_OF_PREDICTION][];
 
             double sumOfWeights = 0.0d;
             double[] tailOfSeq;
@@ -251,7 +256,7 @@ public class Driver {
                 tailOfSeq = seq.getTail();
 
                 if (USE_MEDIAN) {
-                    for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+                    for (int index = 0; index < Sequence.SIZE_OF_PREDICTION; index++) {
                         if(tails[index] == null)
                             tails[index] = new double[this.neighbors.size()];
 
@@ -264,13 +269,13 @@ public class Driver {
                     weight = 1.0d;//calculateWeight();
                     sumOfWeights += weight;
 
-                    for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+                    for (int index = 0; index < Sequence.SIZE_OF_PREDICTION; index++) {
                         predictionResult[index] += weight * tailOfSeq[index];
                     }
                 }
             }
 
-            for (int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++) {
+            for (int index = 0; index < Sequence.SIZE_OF_PREDICTION; index++) {
                 if(USE_MEDIAN) {
                     predictionResult[index] = median.evaluate(tails[index]);
 
@@ -287,19 +292,19 @@ public class Driver {
             double meanOfActualSeq = mean.evaluate(actualSeq);
             double error = 0.0d;
 
-            for(int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++)
+            for(int index = 0; index < Sequence.SIZE_OF_PREDICTION; index++)
                 error += FastMath.abs(predictedSeq[index] - actualSeq[index]);
 
-            return Precision.round(100 * error / (Sequence.SIZE_OF_TAIL_SEQ * meanOfActualSeq),
+            return Precision.round(100 * error / (Sequence.SIZE_OF_PREDICTION * meanOfActualSeq),
                     DECIMAL_SCALE, ROUNDING_METHOD);
         }
 
         private double calculateMeanAbsoluteError(double[] predictedSeq, double[] actualSeq){
             double error = 0.0d;
-            for(int index = 0; index < Sequence.SIZE_OF_TAIL_SEQ; index++)
+            for(int index = 0; index < Sequence.SIZE_OF_PREDICTION; index++)
                 error += FastMath.abs(predictedSeq[index] - actualSeq[index]);
 
-            return Precision.round((error / Sequence.SIZE_OF_TAIL_SEQ), DECIMAL_SCALE, ROUNDING_METHOD);
+            return Precision.round((error / Sequence.SIZE_OF_PREDICTION), DECIMAL_SCALE, ROUNDING_METHOD);
         }
 
 //        private Log  log      = new Log();
@@ -315,7 +320,6 @@ public class Driver {
     }
 
     public static void main(String[] args) throws Exception {
-
         /**********************************************************************************
          **    Merge the source files into one.                                          **
         /**    Should change the directories of each file before executing the program   **

@@ -28,9 +28,9 @@ public class Sequence implements Comparable<Sequence>{
     /*
      * Size Of Sequence can be adjusted to other values.
      */
-    public static final int    SIZE_OF_HEAD_SEQ = 6;
-    public static final int    SIZE_OF_TAIL_SEQ = 36;
-    public static final int    SIZE_OF_SEQUENCE = SIZE_OF_HEAD_SEQ + SIZE_OF_TAIL_SEQ;
+    public static final int    SIZE_OF_WINDOW = 6;
+    public static final int    SIZE_OF_PREDICTION = 3;
+    public static final int    SIZE_OF_SEQUENCE = SIZE_OF_WINDOW + SIZE_OF_PREDICTION;
     public static final String DELIMITER        = "-";
 
     //test(6 + 18)
@@ -38,10 +38,10 @@ public class Sequence implements Comparable<Sequence>{
     //done         : 6, 30, 12, 18, 24, 36
 
     private final String SPLIT_REGEX = "\\-+";
-    private double euclideanDistance = 100.0d;
-    private double[] head     = new double[SIZE_OF_HEAD_SEQ];
-    private double[] tail     = new double[SIZE_OF_TAIL_SEQ];
-    private double[] normHead = new double[SIZE_OF_HEAD_SEQ];
+    private double distance = 100.0d;
+    private double[] head     = new double[SIZE_OF_WINDOW];
+    private double[] tail     = new double[SIZE_OF_PREDICTION];
+    private double[] normHead = new double[SIZE_OF_WINDOW];
 
     public Sequence(String totalInput) throws IOException {
         if(totalInput.equals(""))
@@ -54,17 +54,15 @@ public class Sequence implements Comparable<Sequence>{
         double value;
         for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
             value = inputSequence.get(index);
-            if(index < SIZE_OF_HEAD_SEQ) {
+            if(index < SIZE_OF_WINDOW) {
                 head[index] = value;
             } else{
-                tail[index - SIZE_OF_HEAD_SEQ] = value;
+                tail[index - SIZE_OF_WINDOW] = value;
             }
         }
     }
 
-    public double getEuclideanDistance() { return this.euclideanDistance; }
-
-    public void setEuclideanDistance(double distance){ this.euclideanDistance = distance; }
+    public void setDistance(double distance){ this.distance = distance; }
 
     /**
      * Parse the sequence data to string.<br>
@@ -78,17 +76,17 @@ public class Sequence implements Comparable<Sequence>{
         StringBuilder stringBuilder = new StringBuilder();
 
         for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
-            if(index < SIZE_OF_HEAD_SEQ) {
+            if(index < SIZE_OF_WINDOW) {
                 stringBuilder.append(head[index]);
 
             } else {
-                stringBuilder.append(tail[index - SIZE_OF_HEAD_SEQ]);
+                stringBuilder.append(tail[index - SIZE_OF_WINDOW]);
             }
 
             stringBuilder.append(DELIMITER);
         }
 
-        stringBuilder.append(euclideanDistance);
+        stringBuilder.append(distance);
 
         return stringBuilder.toString();
     }
@@ -97,11 +95,11 @@ public class Sequence implements Comparable<Sequence>{
         StringBuilder stringBuilder = new StringBuilder();
 
         for(int index = 0; index < SIZE_OF_SEQUENCE; index++) {
-            if(index < SIZE_OF_HEAD_SEQ) {
+            if(index < SIZE_OF_WINDOW) {
                 stringBuilder.append(head[index]);
 
             } else {
-                stringBuilder.append(tail[index - SIZE_OF_HEAD_SEQ]);
+                stringBuilder.append(tail[index - SIZE_OF_WINDOW]);
             }
 
             if(index != SIZE_OF_SEQUENCE - 1)
@@ -120,14 +118,14 @@ public class Sequence implements Comparable<Sequence>{
         double value;
         for (int index = 0; index < SIZE_OF_SEQUENCE; index++) {
             value = Double.valueOf(values[index]);
-            if (index < SIZE_OF_HEAD_SEQ) {
+            if (index < SIZE_OF_WINDOW) {
                 head[index] = value;
             } else {
-                tail[index - SIZE_OF_HEAD_SEQ] = value;
+                tail[index - SIZE_OF_WINDOW] = value;
             }
         }
 
-        this.euclideanDistance = Double.valueOf(values[SIZE_OF_SEQUENCE]);
+        this.distance = Double.valueOf(values[SIZE_OF_SEQUENCE]);
     }
 
 
@@ -143,10 +141,10 @@ public class Sequence implements Comparable<Sequence>{
 
     public String getTailString(){
         StringBuilder stringBuilder = new StringBuilder();
-        for(int index = 0; index < SIZE_OF_TAIL_SEQ; index ++){
+        for(int index = 0; index < SIZE_OF_PREDICTION; index ++){
             stringBuilder.append(tail[index]);
 
-            if(index == (SIZE_OF_TAIL_SEQ - 1))
+            if(index == (SIZE_OF_PREDICTION - 1))
                 break;
 
             stringBuilder.append("-");
@@ -170,11 +168,11 @@ public class Sequence implements Comparable<Sequence>{
             Sequence seq = ((Sequence) obj);
 
             for (int index = 0; index < SIZE_OF_SEQUENCE; index++){
-                if ((index < SIZE_OF_HEAD_SEQ)) {
+                if ((index < SIZE_OF_WINDOW)) {
                     if((seq.head[index] != this.head[index]))
                         return false;
 
-                } else if (seq.tail[index - SIZE_OF_HEAD_SEQ] == this.tail[index - SIZE_OF_HEAD_SEQ]) {
+                } else if (seq.tail[index - SIZE_OF_WINDOW] == this.tail[index - SIZE_OF_WINDOW]) {
                     return false;
                 }
             }
@@ -189,7 +187,7 @@ public class Sequence implements Comparable<Sequence>{
 
     @Override
     public int compareTo(Sequence o) {
-        return Double.compare(this.euclideanDistance, o.euclideanDistance);
+        return Double.compare(this.distance, o.distance);
     }
 
 }

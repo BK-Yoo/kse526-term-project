@@ -1,0 +1,1 @@
+Using Hadoop, find NN sequences and get mean of tail sequence.

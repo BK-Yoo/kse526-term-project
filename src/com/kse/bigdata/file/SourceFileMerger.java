@@ -40,18 +40,18 @@ public class SourceFileMerger {
     public SourceFileMerger(String inputDirectory, String outputDirectory){
         this.inputFolder = new File(inputDirectory);
         this.outputFile  = new File(outputDirectory);
-        this.sourceFiles = new ArrayList<>();
+        this.sourceFiles = new ArrayList<File>();
         addFilesInDirectory(this.inputFolder);
     }
 
     public void mergeFiles(){
-        try(PrintWriter printWriter  = new PrintWriter(outputFile)){
-
+        try{
+            PrintWriter printWriter  = new PrintWriter(outputFile);
             for(File sourceFile : sourceFiles) {
                 System.out.println(sourceFile.getName());
 
-                try (BufferedReader fileReader = new BufferedReader(new FileReader(sourceFile))) {
-
+                try{
+                    BufferedReader fileReader = new BufferedReader(new FileReader(sourceFile));
                     //Read the file line by line
                     String line;
                     while ((line = fileReader.readLine()) != null) {

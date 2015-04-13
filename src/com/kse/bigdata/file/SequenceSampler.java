@@ -48,17 +48,17 @@ public class SequenceSampler {
     public SequenceSampler(String sampleDirectory, int sampleSize){
         SAMPLE_SIZE = sampleSize;
         sampleFile = new Path(sampleDirectory);
-        randomSamples =  new LinkedList<>();
+        randomSamples =  new LinkedList<Sequence>();
     }
 
     public LinkedList<Sequence> getRandomSample(){
         System.out.println("Sampling Start...");
         System.out.println("Sample Size is  "+ SAMPLE_SIZE);
 
-        try ( FileSystem fs = FileSystem.get(new Configuration());
-                BufferedReader fileReader = new BufferedReader(new InputStreamReader(fs.open(sampleFile)))) {
-
-            LinkedList<Double> deque = new LinkedList<>();
+        try{
+            FileSystem fs = FileSystem.get(new Configuration());
+            BufferedReader fileReader = new BufferedReader(new InputStreamReader(fs.open(sampleFile)));
+            LinkedList<Double> deque = new LinkedList<Double>();
             String line;
             int[] sampleIndexes = getRandomSampleIndexArray();
             int counter = -1;
@@ -106,7 +106,7 @@ public class SequenceSampler {
                     for(int fileIndex = 0; fileIndex < NUMBER_OF_TEST_SET_FILE; fileIndex++) {
                         fileEdgeNumber = TOTAL_ROW_IN_RAW_FILE * fileIndex;
 
-                        if (((randomIndex < fileEdgeNumber) &&
+                        if(((randomIndex < fileEdgeNumber) &&
                                 (fileEdgeNumber < randomIndex + (Sequence.SIZE_OF_SEQUENCE - 1)))) {
 
                         } else {

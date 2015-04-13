@@ -92,8 +92,8 @@ public class Driver {
         private int previousSourceFileId      = -1;
 
         private final Text                result     = new Text();
-        private final LinkedList<Double>  buffer     = new LinkedList<>();
-        private final SortedSet<Sequence> neighbors  = new TreeSet<>();
+        private final LinkedList<Double>  buffer     = new LinkedList<Double>();
+        private final SortedSet<Sequence> neighbors  = new TreeSet<Sequence>();
 
         private DTW dtw;
 
@@ -192,7 +192,7 @@ public class Driver {
         private final Text error          = new Text();
 
         private Sequence userInputSequence;
-        private final SortedSet<Sequence> neighbors = new TreeSet<>();
+        private final SortedSet<Sequence> neighbors = new TreeSet<Sequence>();
 
         private final Mean   mean     = new Mean();
         private final Median median   = new Median();
@@ -351,7 +351,7 @@ public class Driver {
         String outputPath = null;
 
         int sampleSize = 1;
-        ArrayList<String> results = new ArrayList<>();
+        ArrayList<String> results = new ArrayList<String>();
 
         for (int index = 0; index < args.length; index++) {
 
@@ -440,8 +440,8 @@ public class Driver {
             /*
              * if job finishes, get result of the job and store it in results(list).
              */
-            try (FileSystem hdfs = FileSystem.get(new Configuration())) {
-
+            try{
+                FileSystem hdfs = FileSystem.get(new Configuration());
                 BufferedReader fileReader = new BufferedReader(new InputStreamReader(
                         hdfs.open(new Path(outputPath + "/" + outputFileName))));
 
@@ -453,6 +453,7 @@ public class Driver {
                 fileReader.close();
 
                 hdfs.delete(new Path(outputPath), true);
+                hdfs.close();
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -464,8 +465,8 @@ public class Driver {
          * if all jobs finish, store results of jobs to output/result.txt file.
          */
         String finalOutputPath = "output/result.csv";
-        try (FileSystem hdfs = FileSystem.get(new Configuration())) {
-
+        try{
+            FileSystem hdfs = FileSystem.get(new Configuration());
             Path file = new Path(finalOutputPath);
             if (hdfs.exists(file)) {
                 hdfs.delete(file, true);
@@ -486,6 +487,7 @@ public class Driver {
             }
 
             printWriter.close();
+            hdfs.close();
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
